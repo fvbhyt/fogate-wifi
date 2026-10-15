@@ -38,8 +38,25 @@ struct Cli {
     all: bool,
 
     /// Run an arbitrary read-only CLI command (e.g. "show user setting")
-    #[arg(long, conflicts_with_all = &["list", "change", "all"])]
+    #[arg(long, conflicts_with_all = &["list", "change", "all", "wifi", "ap"])]
     run: Option<String>,
+
+    /// Query online WiFi clients (read-only). Same command + formatting as
+    /// the GUI's 在线 WiFi 用户: `diagnose wireless-controller wlac -d sta`
+    /// rendered as a Markdown table. Works with a read-only account (no 2FA).
+    #[arg(long, conflicts_with_all = &["list", "change", "all", "run", "ap"])]
+    wifi: bool,
+
+    /// Query AP up/down status (read-only). Same command + formatting as the
+    /// GUI's AP 状态: `get wireless-controller wtp-status` rendered as an
+    /// online/offline report. Works with a read-only account (no 2FA).
+    #[arg(long, conflicts_with_all = &["list", "change", "all", "run", "wifi"])]
+    ap: bool,
+
+    /// Save the `--wifi` / `--ap` result to this file instead of printing
+    /// (Markdown). Omit to print to stdout.
+    #[arg(long, value_name = "FILE")]
+    out: Option<String>,
 
     /// Print the raw device response
     #[arg(long)]
@@ -119,6 +136,45 @@ async fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    // --- query online WiFi clients (read-only; no 2FA needed) ---
+    if cli.wifi {
+        let out = fogate_wifi::ssh::ssh_exec(
+            &ssh_args,
+            "diagnose wireless-controller wlac -d sta",
+        )
+        .await?;
+        if cli.verbose {
+            eprintln!("{out}");
+        }
+        let md = core::format_wifi_users(&out);
+        emit(&md, &cli.out)?;
+        return Ok(());
+    }
+
+    // --- query AP up/down status (read-only; no 2FA needed) ---
+    if cli.ap {
+        let out =
+            fogate_wifi::ssh::ssh_exec(&ssh_args, "get wireless-controller wtp-status").await?;
+        if cli.verbose {
+            eprintln!("{out}");
+        }
+        let md = core::format_ap_status(&out);
+        emit(&md, &cli.out)?;
+        return Ok(());
+    }
+
     Cli::command().print_help()?;
+    Ok(())
+}
+
+/// Print a rendered report to stdout, or save it to `file` when given.
+fn emit(text: &str, file: &Option<String>) -> anyhow::Result<()> {
+    match file {
+        Some(path) => {
+            std::fs::write(path, text)?;
+            println!("saved to {path}");
+        }
+        None => println!("{text}"),
+    }
     Ok(())
 }
