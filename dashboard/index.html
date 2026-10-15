@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FortiGate WiFi 看板</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --card: #171e2e;
+    --card2: #1c2436;
+    --border: #2a3448;
+    --fg: #e8edf5;
+    --muted: #8a97ad;
+    --green: #3ecf8f;
+    --red: #ff6b6b;
+    --amber: #f5c451;
+    --accent: #4d9fff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    min-height: 100vh;
+    padding: 24px;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 12px; margin-bottom: 20px;
+  }
+  h1 { font-size: 20px; font-weight: 600; }
+  h1 small { color: var(--muted); font-weight: 400; font-size: 13px; margin-left: 8px; }
+  .update { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+  .pulse {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green); box-shadow: 0 0 6px var(--green);
+  }
+  button {
+    background: var(--accent); color: #fff; border: 0; border-radius: 8px;
+    padding: 8px 18px; font-size: 14px; cursor: pointer;
+    transition: opacity .15s;
+  }
+  button:hover { opacity: .85; }
+  button:disabled { opacity: .5; cursor: default; }
+
+  .kpis {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+    margin-bottom: 20px;
+  }
+  .kpi {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px 18px;
+  }
+  .kpi .label { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .kpi .val { font-size: 30px; font-weight: 700; }
+  .kpi .sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .val.ok { color: var(--green); }
+  .val.warn { color: var(--amber); }
+  .val.bad { color: var(--red); }
+
+  section {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 18px; margin-bottom: 18px;
+  }
+  section h2 {
+    font-size: 15px; font-weight: 600; margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  h2 .badge {
+    font-size: 12px; font-weight: 500; color: var(--muted);
+    background: var(--card2); border-radius: 99px; padding: 2px 10px;
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th {
+    text-align: left; color: var(--muted); font-weight: 500;
+    font-size: 12px; padding: 6px 10px; border-bottom: 1px solid var(--border);
+  }
+  td { padding: 9px 10px; border-bottom: 1px solid #222b3d; }
+  tr:last-child td { border-bottom: 0; }
+  td.mono, .mono { font-family: Consolas, monospace; font-size: 13px; color: var(--muted); }
+
+  .dot {
+    display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+    margin-right: 8px; vertical-align: 1px;
+  }
+  .dot.on { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .dot.off { background: var(--red); box-shadow: 0 0 6px var(--red); }
+  .st-on { color: var(--green); }
+  .st-off { color: var(--red); }
+  .sigbar { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; margin-right: 8px; }
+  .sigbar i { width: 3px; background: var(--accent); border-radius: 1px; }
+  .tag {
+    display: inline-block; font-size: 11px; border-radius: 4px;
+    padding: 1px 7px; background: var(--card2); color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .empty { color: var(--muted); font-size: 14px; padding: 14px 4px; }
+  footer { color: var(--muted); font-size: 12px; text-align: center; margin-top: 8px; }
+  @media (max-width: 640px) { .kpis { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>FortiGate <small>WiFi 实时看板 · 10.0.0.1</small></h1>
+    <div class="update">
+      <span class="pulse"></span>
+      <span id="countdown">300s 后自动刷新</span>
+      <button id="btn-refresh">立即刷新</button>
+    </div>
+  </header>
+
+  <div class="kpis">
+    <div class="kpi">
+      <div class="label">在线用户</div>
+      <div class="val ok" id="kpi-users">3</div>
+      <div class="sub">当前连接的无线终端</div>
+    </div>
+    <div class="kpi">
+      <div class="label">AP 在线</div>
+      <div class="val warn" id="kpi-ap">1 / 3</div>
+      <div class="sub" id="kpi-ap-sub">2 台离线</div>
+    </div>
+    <div class="kpi">
+      <div class="label">上次更新</div>
+      <div class="val" style="font-size:20px" id="kpi-time">—</div>
+      <div class="sub">数据每 5 分钟自动刷新</div>
+    </div>
+  </div>
+
+  <section>
+    <h2>在线用户 <span class="badge" id="user-count">3 台</span></h2>
+    <table>
+      <thead>
+        <tr><th>主机</th><th>SSID</th><th>IP</th><th>MAC</th><th>信号</th><th>信道</th><th>加密</th></tr>
+      </thead>
+      <tbody id="user-rows">
+        <tr>
+          <td>Tablet-A</td><td>Office-2G</td><td>10.0.0.160</td>
+          <td class="mono">02:42:ac:10:00:03</td>
+          <td><span class="sigbar"><i style="height:11px"></i><i style="height:14px"></i></span><b class="st-on">-34</b></td>
+          <td>1 <span class="tag">2.4G</span></td><td>WPA3</td>
+        </tr>
+        <tr>
+          <td>Phone-B</td><td>Office-5G</td><td>10.0.0.152</td>
+          <td class="mono">02:42:ac:10:00:02</td>
+          <td><span class="sigbar"><i style="height:11px"></i><i style="height:14px"></i></span>-48</td>
+          <td>149 <span class="tag">5G</span></td><td>WPA3</td>
+        </tr>
+        <tr>
+          <td>Phone-A</td><td>Office-5G</td><td>10.0.0.156</td>
+          <td class="mono">02:42:ac:10:00:01</td>
+          <td><span class="sigbar"><i style="height:11px"></i><i style="height:14px"></i></span>-49</td>
+          <td>149 <span class="tag">5G</span></td><td>WPA3</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>AP 状态 <span class="badge" id="ap-count">在线 1 · 离线 2</span></h2>
+    <table>
+      <thead>
+        <tr><th>AP</th><th>wtp-id</th><th>状态</th><th>管理 IP</th></tr>
+      </thead>
+      <tbody id="ap-rows">
+        <tr>
+          <td><span class="dot on"></span>AP-One</td>
+          <td class="mono">APT-0001</td>
+          <td class="st-on">在线</td>
+          <td>10.0.0.158</td>
+        </tr>
+        <tr>
+          <td><span class="dot off"></span>AP-Two</td>
+          <td class="mono">APT-0003</td>
+          <td class="st-off">离线</td>
+          <td class="st-off">—</td>
+        </tr>
+        <tr>
+          <td><span class="dot off"></span>AP-Three</td>
+          <td class="mono">APT-0002</td>
+          <td class="st-off">离线</td>
+          <td class="st-off">—</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <footer>式样版 · 数据为 2026-10-15 真机快照 · 正式版将每 5 分钟通过 CLI 自动拉取</footer>
+</div>
+
+<script>
+  // ===== 式样版：倒计时 + 模拟刷新。接真实数据时把 refresh() 换成调后端接口即可 =====
+  const REFRESH_SEC = 300;
+  let remain = REFRESH_SEC;
+  const cd = document.getElementById("countdown");
+  const btn = document.getElementById("btn-refresh");
+
+  function stamp() {
+    const d = new Date();
+    const p = n => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  }
+
+  function refresh() {
+    // 模拟刷新：正式版在这里 fetch('/api/snapshot') 并重新渲染两张表 + KPI
+    document.getElementById("kpi-time").textContent = stamp();
+    remain = REFRESH_SEC;
+    btn.disabled = true;
+    setTimeout(() => btn.disabled = false, 800);
+  }
+
+  document.getElementById("kpi-time").textContent = stamp();
+  setInterval(() => {
+    remain--;
+    if (remain <= 0) { refresh(); }
+    const m = Math.floor(remain / 60), s = String(remain % 60).padStart(2, "0");
+    cd.textContent = remain > 0 ? `${m > 0 ? m + "分" : ""}${s}秒 后自动刷新` : "正在刷新…";
+  }, 1000);
+  btn.addEventListener("click", refresh);
+</script>
+</body>
+</html>

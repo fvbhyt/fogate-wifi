@@ -1,0 +1,35 @@
+[package]
+name = "fogate-wifi"
+version = "0.1.0"
+edition = "2021"
+description = "Manage FortiGate WiFi SSID passwords over SSH CLI"
+
+[lib]
+name = "fogate_wifi"
+path = "src/lib.rs"
+
+[[bin]]
+name = "fogate-wifi"
+path = "src/bin/cli.rs"
+
+[[bin]]
+name = "fogate-wifi-gui"
+path = "src/bin/gui.rs"
+
+[[bin]]
+name = "otp-probe"
+path = "src/bin/otp_probe.rs"
+
+[dependencies]
+russh = "0.64"
+tokio = { version = "1", features = ["full"] }
+clap = { version = "4", features = ["derive"] }
+anyhow = "1"
+rpassword = "7"
+# eframe native window (glow renderer via dlopen — no GL SDK needed on Windows)
+eframe = "0.31"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+strip = true

@@ -1,0 +1,32 @@
+# ---- Machine-specific build config (absolute MSVC paths — don't vendor) ----
+/.cargo/
+
+# ---- Build artifacts ----
+/target/
+/dist/
+*.exe
+*.dll
+*.pyd
+
+# ---- Credentials & local config (never commit) ----
+# GUI saves connection settings here at runtime
+fogate-wifi-config.json
+*.json
+!Cargo.toml
+
+# ---- Third-party / bundled binaries (copyright-sensitive, keep out of a public repo) ----
+/tftp_assets/
+
+# ---- Abandoned feature leftovers (TFTP log-backup was cancelled) ----
+/otp_sink/
+
+# ---- Scratch / editor / OS ----
+*.raw
+*.log
+.DS_Store
+Thumbs.db
+
+# ---- Machine-specific build scripts (hardcode local MSVC/cargo paths) ----
+/build.bat
+/build.ps1
+/diag.bat
